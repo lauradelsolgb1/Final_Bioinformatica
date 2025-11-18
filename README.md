@@ -139,6 +139,54 @@ p1 <- ggplot(genes_long, aes(x = tiempo, y = Counts, fill = tiempo)) +
 
 print(p1)
 ```
+4.5) Verificación genes marcadores de pluripotencia
+Genes que se espera estén downregulated en la diferenciación
+```r
+genes_downregulated <- c("HES3", "DAZL", "POU5F1", "SOX2")
+```
+Obtener IDs de los genes
+```r
+gene_ids_down <- genes$Gene.ID[genes$Gene.Name %in% genes_downregulated]
+names(gene_ids_down) <- genes$Gene.Name[genes$Gene.Name %in% genes_downregulated]
+print(gene_ids_down)
+```
+Extraer conteos crudos
+```r
+genes_counts_down <- counts[gene_ids_down, ]
+```
+Preparar datos
+```r
+genes_data_down <- as.data.frame(t(genes_counts_down))
+genes_data_down$Sample <- rownames(genes_data_down)
+genes_data_down$tiempo <- metadata[rownames(genes_data_down), "tiempo"]
+colnames(genes_data_down)[1:length(gene_ids_down)] <- names(gene_ids_down)
+
+# Convertir a formato largo
+genes_long_down <- melt(genes_data_down, 
+                        id.vars = c("Sample", "tiempo"),
+                        variable.name = "Gene",
+                        value.name = "Counts")
+```
+Crear boxplot
+```r
+p_down <- ggplot(genes_long_down, aes(x = tiempo, y = Counts, fill = tiempo)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.1, alpha = 0.6, size = 2) +
+  facet_wrap(~Gene, scales = "free_y", ncol = 2) +
+  labs(title = "Conteos crudos de genes DOWN-REGULADOS",
+       subtitle = "Marcadores de pluripotencia: HES3, DAZL, POU5F1, SOX2",
+       x = "Tiempo", 
+       y = "Conteos (sin normalizar)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("0" = "#E41A1C", "72" = "#377EB8"),
+                    labels = c("0h (ESC - alta expresión)", 
+                               "72h (Endodermo - baja expresión)")) +
+  theme(strip.text = element_text(size = 11, face = "bold"),
+        legend.position = "top",
+        legend.title = element_blank())
+
+print(p_down)
+```
 ### 5) Crear el objeto DESeq y correr el análisis
 
 design = ~ tiempo indica que queremos probar diferencias por tiempo. Filtramos genes muy poco expresados (ruido) para evitar falsos positivos
