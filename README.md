@@ -1,4 +1,4 @@
-# ** Análisis expresión diferencial rna-seq**
+# **Análisis expresión diferencial rna-seq**
 ### 0 horas vs 72 horas
 ### Basado en el estudio: Diferenciación de células madre embrionarias a endodermo
 ### Experimento: E-MTAB-9194 (Expression Atlas)
