@@ -101,26 +101,44 @@ metadata$tiempo <- factor(metadata$tiempo, levels = c("0", "72"))
 metadata$tiempo
 ```
 
-### 4) Verificación rápida: Gen marcador LZTS1
+### 4) VERIFICACIÓN RÁPIDA: Genes marcadores (EOMES, SOX17, LZTS1, GATA4)
 ```r
-gene_id <- genes$Gene.ID[genes$Gene.Name == "LZTS1"]
-gene_counts <- counts[gene_id, ]
-gene_data <- cbind(metadata, counts = as.numeric(gene_counts))
+genes_a_verificar <- c("EOMES", "SOX17", "LZTS1", "GATA4")
+gene_ids <- genes$Gene.ID[genes$Gene.Name %in% genes_a_verificar]
+names(gene_ids) <- genes$Gene.Name[genes$Gene.Name %in% genes_a_verificar]
 ```
-
-Boxplot de expresión cruda
+4.2) Extraer conteos crudos para estos genes
 ```r
-p1 <- ggplot(gene_data, aes(x = tiempo, y = counts, fill = tiempo)) +
-  geom_boxplot() +
-  geom_jitter(width = 0.1, alpha = 0.5) +
-  labs(title = "Conteos crudos de LZTS1 por tiempo",
-       x = "Tiempo", y = "Conteos (sin normalizar)") +
+genes_counts <- counts[gene_ids, ]
+
+
+genes_data <- as.data.frame(t(genes_counts))
+genes_data$Sample <- rownames(genes_data)
+genes_data$tiempo <- metadata[rownames(genes_data), "tiempo"]
+colnames(genes_data)[1:length(gene_ids)] <- names(gene_ids)
+
+genes_long <- melt(genes_data, 
+                   id.vars = c("Sample", "tiempo"),
+                   variable.name = "Gene",
+                   value.name = "Counts")
+```
+4.4) Crear boxplot con los 4 genes
+```r
+p1 <- ggplot(genes_long, aes(x = tiempo, y = Counts, fill = tiempo)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.1, alpha = 0.6, size = 2) +
+  facet_wrap(~Gene, scales = "free_y", ncol = 2) +
+  labs(title = "Conteos crudos de genes marcadores por tiempo",
+       subtitle = "EOMES, SOX17, LZTS1, GATA4",
+       x = "Tiempo", 
+       y = "Conteos (sin normalizar)") +
   theme_minimal() +
-  scale_fill_brewer(palette = "Set2")
+  scale_fill_brewer(palette = "Set2") +
+  theme(strip.text = element_text(size = 11, face = "bold"),
+        legend.position = "top")
 
 print(p1)
 ```
-
 ### 5) Crear el objeto DESeq y correr el análisis
 
 design = ~ tiempo indica que queremos probar diferencias por tiempo. Filtramos genes muy poco expresados (ruido) para evitar falsos positivos
@@ -150,6 +168,15 @@ dds <- DESeq(dds)
 ```r
 res <- results(dds, contrast = c("tiempo", "72", "0"), alpha = 0.01)
 head(res)
+log2 fold change (MLE): tiempo 72 vs 0 
+Wald test p-value: tiempo 72 vs 0 
+DataFrame with 6 rows and 6 columns
+                  baseMean log2FoldChange     lfcSE      stat      pvalue        padj
+                 <numeric>      <numeric> <numeric> <numeric>   <numeric>   <numeric>
+ENSG00000000003 7103.25156     -0.2256343 0.0375516  -6.00864 1.87082e-09 5.50784e-09
+ENSG00000000005  243.95564     -2.8230870 0.1677082 -16.83333 1.39066e-63 1.16495e-62
+ENSG00000000419 6073.28534     -0.0800895 0.0362277  -2.21073 2.70548e-02 4.60104e-02
+ENSG00000000457  853.23085      0.2192106 0.0713694   3.07149 2.12990e-03 4.23214e-03
 ```
 
 ### 6) Control de calidad: PCA
@@ -201,6 +228,7 @@ mean_expression <- rowMeans(normalized_counts)
 high_expr_genes <- names(mean_expression[mean_expression > 10])
 
 cat(length(high_expr_genes))
+22724 
 ```
 
 Calcular correlación solo con genes altamente expresados
@@ -208,6 +236,13 @@ Calcular correlación solo con genes altamente expresados
 cor_matrix <- cor(normalized_counts[high_expr_genes, ], method = "spearman")
 
 print(round(cor_matrix, 3))
+           ERR4235451 ERR4235461 ERR4235462 ERR4235463 ERR4235464 ERR4235465
+ERR4235451      1.000      0.919      0.995      0.919      0.918      0.995
+ERR4235461      0.919      1.000      0.919      0.995      0.996      0.919
+ERR4235462      0.995      0.919      1.000      0.919      0.918      0.995
+ERR4235463      0.919      0.995      0.919      1.000      0.996      0.919
+ERR4235464      0.918      0.996      0.918      0.996      1.000      0.918
+ERR4235465      0.995      0.919      0.995      0.919      0.918      1.000
 ```
 
 7.3) Heatmap de correlación con clustering jerárquico
@@ -262,6 +297,27 @@ res_df_filtered <- res_df_clean[
 res_df_filtered <- res_df_filtered[order(res_df_filtered$padj), ]
 
 print(res_df_filtered[1:20, c("Gene.Name", "log2FoldChange", "padj")]) #los 20 más significativos
+    Gene.Name log2FoldChange padj
+42    NDUFAF7      -1.444831    0
+106     ITGA3       1.832659    0
+116      YBX2      -1.804203    0
+128    MAP3K9       1.277301    0
+131     KDM7A       2.077349    0
+157     PROM1      -3.585410    0
+168     SCN4A      -3.583746    0
+175  CACNA2D2      -1.741931    0
+180     TEAD3       2.622174    0
+188    JARID2      -1.039358    0
+223      PAX7       4.837460    0
+240       CD9      -1.985595    0
+265      MRC2       2.454198    0
+328    MAMLD1       5.297447    0
+358   SLC38A5      -3.322193    0
+367    ATP1A2      -3.921468    0
+433       VIM       1.370777    0
+468  ARHGAP31       3.751753    0
+483      GAB2       1.767040    0
+490    TMSB10       1.519033    0
 ```
 
 ### 9) Verificación de genes marcadores EOMES, SOX17, LZTS1 y GATA4
@@ -275,6 +331,11 @@ if(nrow(marcadores) > 0) {
   marcadores_all <- res_df_clean[res_df_clean$Gene.Name %in% genes_a_verificar, ]
   print(marcadores_all[, c("Gene.Name", "log2FoldChange", "padj", "baseMean")])
 }
+      Gene.Name log2FoldChange padj  baseMean
+791       LZTS1       4.684407    0 32976.732
+6841      GATA4       4.826014    0  6038.701
+10235     EOMES       5.791150    0 54252.276
+10593     SOX17       5.456209    0 15988.506
 ```
 
 ### 10) Visualizaciones
@@ -358,17 +419,3 @@ write.csv(subset_marcadores, "deseq_marcadores.csv",
           row.names = FALSE)
 ```
 
-12.5) Guardar matriz de conteos normalizados
-```r
-write.csv(normalized_counts, "normalized_counts.csv", 
-          row.names = TRUE)
-```
-
-12.6) Guardar matriz de correlación
-```r
-write.csv(cor_matrix, "correlation_matrix_spearman.csv", 
-          row.names = TRUE)
-
-cat("- CSVs con resultados (ver lista arriba)\n")
-cat("- Gráficos: PCA, MA plot, Volcano plot, Heatmap de correlación\n\n")
-```
