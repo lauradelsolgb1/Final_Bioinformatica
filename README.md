@@ -1,5 +1,5 @@
-# ANÁLISIS DE EXPRESIÓN DIFERENCIAL RNA-SEQ
-#0 horas vs 72 horas
+# ** Análisis expresión diferencial rna-seq**
+### 0 horas vs 72 horas
 ### Basado en el estudio: Diferenciación de células madre embrionarias a endodermo
 ### Experimento: E-MTAB-9194 (Expression Atlas)
 ### Comparación: embryonic stem cell (0h) vs definitive endoderm cell (72h)
@@ -30,9 +30,9 @@ metadatas <- read.delim("https://www.ebi.ac.uk/gxa/experiments-content/E-MTAB-91
 ```
 ## 2) SELECCIÓN DE MUESTRAS DE INTERÉS (0h y 72h), ya que sin esta selección inicial se hacia muy dificil el tratamiento de los datos nulos 
 
-# - ERR4235451, ERR4235464, ERR4235465: 0h (réplicas 1,  2, 3)
-# - ERR4235461, ERR4235462, ERR4235463: 72h (réplicas 1, 2, 3)
-
+### - ERR4235451, ERR4235464, ERR4235465: 0h (réplicas 1,  2, 3)
+### - ERR4235461, ERR4235462, ERR4235463: 72h (réplicas 1, 2, 3)
+```r
 counts <- countss[, c("Gene.ID", "Gene.Name",
                       "ERR4235451", "ERR4235461", "ERR4235462",
                       "ERR4235463", "ERR4235464", "ERR4235465")]
@@ -42,6 +42,70 @@ metadata <- metadatas[metadatas$Run %in% c("ERR4235451", "ERR4235461",
                                            "ERR4235462", "ERR4235463",
                                            "ERR4235464", "ERR4235465"), ]
 head(metadata)
+```
+## 3) ACOMODAR LOS DATOS AL FORMATO QUE DESeq2 ESPERA
+
+# 3.1) Poner IDs de gen como rownames
+rownames(counts) <- counts$Gene.ID
+
+# 3.2) Guardar info de genes
+genes <- counts[, c("Gene.ID", "Gene.Name")]
+
+# 3.3) Dejar solo columnas numéricas de conteos
+counts <- counts[, -c(1, 2)]
+
+# 3.4) Preparar metadata
+rownames(metadata) <- metadata$Run
+metadata <- metadata[, "Factor.Value.time.", drop = FALSE]
+colnames(metadata) <- "tiempo"
+
+# 3.5) Limpiar etiquetas
+metadata$tiempo[metadata$tiempo == "0 hour"] <- "0"
+metadata$tiempo[metadata$tiempo == "72 hour"] <- "72"
+
+# 3.6) Declarar factor con orden
+metadata$tiempo <- factor(metadata$tiempo, levels = c("0", "72"))
+
+## 4) VERIFICACIÓN: gen LZTS1
+
+gene_id <- genes$Gene.ID[genes$Gene.Name == "LZTS1"]
+gene_counts <- counts[gene_id, ]
+gene_data <- cbind(metadata, counts = as.numeric(gene_counts))
+
+ggplot(gene_data, aes(x = tiempo, y = counts, fill = tiempo)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.1, alpha = 0.5) +
+  labs(title = "Conteos crudos de LZTS1 por tiempo") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set2")
+
+## 5) CREAR OBJETO DESEQ2 Y CORRER ANÁLISIS
+
+dds <- DESeqDataSetFromMatrix(countData = counts,
+                              colData = metadata,
+                              design = ~ tiempo)
+
+# Filtrar genes con baja expresión
+dds <- dds[rowSums(counts(dds)) > 10, ]
+
+# Ejecutar análisis
+dds <- DESeq(dds)
+
+# Contraste 72 vs 0
+res <- results(dds, contrast = c("tiempo", "72", "0"), alpha = 0.01)
+
+## 6) PCA PARA CONTROL DE CALIDAD
+
+vsd <- vst(dds, blind = FALSE)
+pca_data <- plotPCA(vsd, intgroup = "tiempo", returnData = TRUE)
+percentVar <- round(100 * attr(pca_data, "percentVar"))
+
+ggplot(pca_data, aes(PC1, PC2, color = tiempo, shape = tiempo)) +
+  geom_point(size = 5, alpha = 0.8) +
+  geom_text(aes(label = name), vjust = -1.5, size = 3.5, fontface = "bold") +
+  xlab(paste0("PC1: ", percentVar[1], "% varianza")) +
+  ylab(paste0("PC2: ", percentVar[2], "% varianza")) +
+  theme_minimal()
 
 # 3) Acomodar los datos al formato que DESeq2 espera
 #    - Filas de 'counts' = genes (con sus IDs en rownames)
