@@ -264,7 +264,7 @@ pheatmap(cor_matrix,
          number_format = "%.2f")
 ```
 
-### 8) Filtrado estricto según criterios del paper
+### 8) Filtrado estricto según criterios del estuddio original
 
 Criterios: |log2FC| ≥ log2(1.5) = 0.585 AND padj < 0.01
 
